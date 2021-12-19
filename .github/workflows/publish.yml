@@ -15,12 +15,15 @@ jobs:
       - name: set current tag var
         id: currentTag
         run: echo ::set-output name=tag::${GITHUB_REF##*/v}
-      - name: Build and push Docker images
-        uses: docker/build-push-action@v1
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: whefter/mod-auth-openidc-forwardauth
-          build_args: MODAUTHOPENIDC_VERSION=${{ steps.currentTag.outputs.tag }}
-          tags: latest,${{ steps.currentTag.outputs.tag }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v2
+        with:
+          tags: |
+            delker/traefik-forward-auth-modopenidc:latest
+            delker/traefik-forward-auth-modopenidc:${{ steps.currentTag.outputs.tag }}
           push: ${{ startsWith(github.ref, 'refs/tags/') }}

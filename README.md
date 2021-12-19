@@ -1,6 +1,7 @@
-## mod-auth-openidc-forwardauth
+## traefik-forward-auth-modopenidc
 
-A Docker image for a forwardauth container based on the `mod_auth_openidc` Apache 2.x module. This image is meant to serve in conjunction with Traefik and other compatible reverse proxies. Claim requirements are configurable through Docker ENVs.
+A Docker image for a forwardauth container based on the `mod_auth_openidc` Apache 2.x module.
+This image is meant to serve in conjunction with Traefik and other compatible reverse proxies.
 
 - [Why this image exists](#why-this-image-exists)
 - [Quickstart](#quickstart)
@@ -12,11 +13,13 @@ A Docker image for a forwardauth container based on the `mod_auth_openidc` Apach
 
 # Why this image exists
 
-I use Keycloak for my personal services and wanted the ability to easily add authentication/authorization to internal apps without having to implement actual login/auth mechanisms for them. An easy way to do this for dockerized apps is to use Traefik as a reverse proxy and make use of its forwardAuth mechanism. I used [Thom Seddon's very useful image](https://github.com/thomseddon/traefik-forward-auth) for a while, but this only allows an explicit email address whitelist as a Docker ENV to limit access.
+This is a slightly modified fork of [whefter's docker-mod-auth-openidc-forwardauth](https://github.com/whefter/docker-mod-auth-openidc-forwardauth), which just contains some minor improvements and cleanup.
+I share his requirement for a more sophisticated method to authorize users via OpenID. Except the build-in [OpenID Connect Authentication](https://doc.traefik.io/traefik-enterprise/middlewares/oidc/) of Traefik Enterprise, I'm not aware of any other free forard-auth module, to authorize against OpenID claims, rather than individual user whitelists.
 
-What I ultimately required was the ability to specify flexible claim requirements, as allowed by `mod_auth_openidc`. Unfortunately, there is no Docker image with `mod_auth_openidc` that works as a forwardAuth image, mostly because it is meant to act as a transparent module in cases where the app is included in the httpd container.
+Using a full Apache HTTP setup, combined with mod_auth_openidc for this task, is somewhat overkill for my taste. However, it actually provides a solution to the problem. I would rather use a leaner approach like [Thom Seddon's traefik-forward-auth](https://github.com/thomseddon/traefik-forward-auth), but enhancing that for claim authorization would require skills in GO, which I unfortunately don't have.
 
-This image uses a workaround to make `mod_auth_openidc` work in a forwardAuth setting.
+Besides the requirement to specify flexible claim requirements, I would rather like to use a single forward-auth instance for all container authorizations. Currently, you will require a distinct instance of this provider for each claim requirement, because the authorization configuration is static in the underlying httpd configuration.
+I could thing of smarter ways to do that (like providing the claim requirements via query-params on the forwardauth.address URL), but unfortunately that isn't possible with httpd's rather static configuration.
 
 # Quickstart
 
@@ -29,19 +32,8 @@ networks:
   app: {}
 
 services:
-  forwardauth:
-    image: whefter/mod-auth-openidc-forwardauth
-    networks:
-      - app
-    environment:
-      OIDC_PROVIDER_METADATA_URL: https://keycloak.example.com/auth/realms/modauthopenidctest/.well-known/openid-configuration
-      OIDC_CLIENT_ID: client-id
-      OIDC_CLIENT_SECRET: client-secret
-      OIDC_CRYPTO_PASSPHRASE: random-crypto-passphrase
-      OIDC_REQUIRE_CLAIM: resource_access.client-id.roles:mod-auth-openidc-test-access
-
   traefik:
-    image: traefik:v2.4
+    image: traefik:v2.5
     networks:
       - app
     command:
@@ -55,8 +47,19 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
-  app:
-    image: my-app
+  forwardauth:
+    image: delker/mod-auth-openidc-forwardauth
+    networks:
+      - app
+    environment:
+      OIDC_PROVIDER_METADATA_URL: https://keycloak.example.com/auth/realms/modauthopenidctest/.well-known/openid-configuration
+      OIDC_CLIENT_ID: client-id
+      OIDC_CLIENT_SECRET: client-secret
+      OIDC_CRYPTO_PASSPHRASE: random-crypto-passphrase
+      OIDC_REQUIRE_CLAIM: resource_access.client-id.roles:mod-auth-openidc-test-access
+
+  whoami:
+    image: traefik/whoami
     networks:
       - app
     labels:
@@ -65,10 +68,8 @@ services:
       traefik.docker.network: modauthopenidctest_app
       traefik.http.routers.httpd.rule: Host(`localhost`)
       traefik.http.routers.httpd.entrypoints: web
-      traefik.http.routers.httpd.service: httpd
-      traefik.http.services.httpd.loadbalancer.server.port: "8080"
       traefik.http.middlewares.httpd_forwardauth.forwardauth.address: http://forwardauth:80/
-      traefik.http.middlewares.traefik-forward-auth.forwardauth.authResponseHeaders: X-Forwarded-User
+      traefik.http.middlewares.httpd_forwardauth.forwardauth.authResponseHeaders: X-Forwarded-User
       traefik.http.routers.httpd.middlewares: httpd_forwardauth
 ```
 
@@ -126,11 +127,3 @@ All headers set by `mod_auth_openidc` inside the forwardAuth container for the r
 This also (currently) includes the access token, which is set by `mod_auth_openidc` to the `OIDC-Access-Token` header, and the claims, set to the `OIDC-Claim-*` headers. Should `mod_auth_openidc` change its behavior related to these headers, this might change.
 
 Security implications of sending headers with potentially sensitive data to the app should be considered.
-
-## Debugging headers
-
-If you're unsure which headers are available or otherwise need to debug their content, check out the `examples/echo-headers/` example, which employs the extremely useful `brndnmtthws/nginx-echo-headers` image to simply output all headers after successful authentication.
-
-# Examples
-
-See the `examples/` folder for available examples. More examples may be added in the future.

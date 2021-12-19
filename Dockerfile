@@ -1,5 +1,6 @@
 FROM httpd
-ARG MODAUTHOPENIDC_VERSION=2.4.6
+ARG MODAUTHOPENIDC_VERSION=2.4.10
+ARG HTTPDCONF=httpd-openidc.conf
 
 RUN apt update \
     && apt install -y \
@@ -12,34 +13,32 @@ RUN apt update \
     && apt autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir /usr/local/apache2/htdocs/__modauthopenidc_auth__ \
-    && echo "auth" > /usr/local/apache2/htdocs/__modauthopenidc_auth__/index.html \
-    && mkdir /conf \
-    && echo "Include /conf/openidc.conf" >> /usr/local/apache2/conf/httpd.conf
+RUN echo "Include /tmp/${HTTPDCONF}" >> /usr/local/apache2/conf/httpd.conf
 
-COPY conf/*.conf /conf/
+COPY conf /conf/
 COPY docker-cmd.sh /docker-cmd.sh
 
 # Default values
-ENV OIDC_PROVIDER_METADATA_URL=""
-ENV OIDC_CLIENT_ID=""
-ENV OIDC_CLIENT_SECRET=""
-ENV OIDC_CRYPTO_PASSPHRASE=""
-ENV OIDC_SCOPE="openid email"
-ENV OIDC_REMOTE_USER_CLAIM="preferred_username"
-ENV OIDC_VHOST_EXTRA_CONFIG=""
-ENV OIDC_REQUIRE_CLAIM=""
-ENV OIDC_REQUIRE_CLAIM_1=""
-ENV OIDC_REQUIRE_CLAIM_2=""
-ENV OIDC_REQUIRE_CLAIM_3=""
-ENV OIDC_REQUIRE_CLAIM_4=""
-ENV OIDC_REQUIRE_CLAIM_5=""
-ENV OIDC_REQUIRE_CLAIM_6=""
-ENV OIDC_REQUIRE_CLAIM_7=""
-ENV OIDC_REQUIRE_CLAIM_8=""
-ENV OIDC_REQUIRE_CLAIM_9=""
-ENV OIDC_REQUIRE_CLAIM_10=""
-ENV OIDC_LOCATION_EXTRA_CONFIG=""
+ENV OIDC_PROVIDER_METADATA_URL="" \
+    OIDC_CLIENT_ID="" \
+    OIDC_CLIENT_SECRET="" \
+    OIDC_REDIRECT_URI="/modauthopenidc_redirect_uri" \
+    OIDC_CRYPTO_PASSPHRASE="" \
+    OIDC_SCOPE="openid email" \
+    OIDC_REMOTE_USER_CLAIM="preferred_username" \
+    OIDC_VHOST_EXTRA_CONFIG="" \
+    OIDC_REQUIRE_CLAIM="" \
+    OIDC_REQUIRE_CLAIM_1="" \
+    OIDC_REQUIRE_CLAIM_2="" \
+    OIDC_REQUIRE_CLAIM_3="" \
+    OIDC_REQUIRE_CLAIM_4="" \
+    OIDC_REQUIRE_CLAIM_5="" \
+    OIDC_REQUIRE_CLAIM_6="" \
+    OIDC_REQUIRE_CLAIM_7="" \
+    OIDC_REQUIRE_CLAIM_8="" \
+    OIDC_REQUIRE_CLAIM_9="" \
+    OIDC_REQUIRE_CLAIM_10="" \
+    OIDC_LOCATION_EXTRA_CONFIG=""
 
 
 CMD ["/docker-cmd.sh"]
